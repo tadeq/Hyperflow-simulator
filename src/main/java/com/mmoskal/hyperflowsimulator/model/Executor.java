@@ -9,8 +9,8 @@ import java.util.List;
 public class Executor {
 
     @JsonProperty("executable")
-    private String executable;
+    String executable;
 
     @JsonProperty("args")
-    private List<String> args;
+    List<String> args;
 }

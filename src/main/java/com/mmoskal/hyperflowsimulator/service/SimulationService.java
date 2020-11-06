@@ -1,5 +1,7 @@
 package com.mmoskal.hyperflowsimulator.service;
 
+import com.mmoskal.hyperflowsimulator.model.Config;
+import org.cloudbus.cloudsim.allocationpolicies.VmAllocationPolicyBestFit;
 import org.cloudbus.cloudsim.brokers.DatacenterBroker;
 import org.cloudbus.cloudsim.brokers.DatacenterBrokerSimple;
 import org.cloudbus.cloudsim.cloudlets.Cloudlet;
@@ -11,6 +13,7 @@ import org.cloudbus.cloudsim.hosts.Host;
 import org.cloudbus.cloudsim.hosts.HostSimple;
 import org.cloudbus.cloudsim.resources.Pe;
 import org.cloudbus.cloudsim.resources.PeSimple;
+import org.cloudbus.cloudsim.schedulers.cloudlet.CloudletSchedulerSpaceShared;
 import org.cloudbus.cloudsim.utilizationmodels.UtilizationModelDynamic;
 import org.cloudbus.cloudsim.vms.Vm;
 import org.cloudbus.cloudsim.vms.VmSimple;
@@ -19,11 +22,53 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class SimulationService {
 
+    private final List<Config> configs = new ArrayList<>();
+
+    public void addConfig(Config config) {
+        configs.add(config);
+    }
+
     public void runSimulation() {
+        CloudSim cloudsim = new CloudSim();
+        DatacenterBroker broker = new DatacenterBrokerSimple(cloudsim);
+        List<Pe> pes1 = List.of(
+                new PeSimple(10000),
+                new PeSimple(10000),
+                new PeSimple(10000),
+                new PeSimple(10000)
+        );
+        Host host1 = new HostSimple(32_000, 128_000, 128_000, pes1);
+        List<Pe> pes2 = List.of(
+                new PeSimple(2000),
+                new PeSimple(2000)
+        );
+        Host host2 = new HostSimple(16_000, 64_000, 32_000, pes2);
+        Datacenter datacenter = new DatacenterSimple(cloudsim, List.of(host1, host2), new VmAllocationPolicyBestFit());
+        Vm vm = new VmSimple(500, 2)
+                .setBw(8000)
+                .setRam(8000)
+                .setSize(1000)
+                .setCloudletScheduler(new CloudletSchedulerSpaceShared());
+
+        broker.submitVm(vm);
+
+        UtilizationModelDynamic utilizationModel = new UtilizationModelDynamic(0.4);
+        List<Cloudlet> cloudlets = configs.stream()
+                .map(config -> new CloudletSimple(25000, 1, utilizationModel))
+                .collect(Collectors.toList());
+        broker.submitCloudletList(cloudlets);
+
+        cloudsim.start();
+
+        new CloudletsTableBuilder(broker.getCloudletFinishedList()).build();
+    }
+
+    public void runTestSimulation() {
         //Enables just some level of logging.
         //Make sure to import org.cloudsimplus.util.Log;
         //Log.setLevel(ch.qos.logback.classic.Level.WARN);
@@ -50,7 +95,7 @@ public class SimulationService {
 
         //Creates a Datacenter with a list of Hosts.
         //Uses a VmAllocationPolicySimple by default to allocate VMs
-        Datacenter dc0 = new DatacenterSimple(cloudsim, hostList);
+        Datacenter dc0 = new DatacenterSimple(cloudsim, hostList, new VmAllocationPolicyBestFit());
 
         //Creates VMs to run applications.
         List<Vm> vmList = new ArrayList<>(1);

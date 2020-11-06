@@ -1,5 +1,7 @@
 package com.mmoskal.hyperflowsimulator.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mmoskal.hyperflowsimulator.model.Config;
 import com.mmoskal.hyperflowsimulator.service.SimulationService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 @Controller
 public class SimulatorController {
 
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private SimulationService simulationService;
 
     @Autowired
@@ -20,14 +24,25 @@ public class SimulatorController {
     }
 
     @PostMapping("simulate")
-    public ResponseEntity<?> simulate(@RequestBody Config config) {
-        System.out.println(config);
+    public ResponseEntity<?> addJob(@RequestBody Config config) {
+        try {
+            System.out.println(OBJECT_MAPPER.writeValueAsString(config));
+            simulationService.addConfig(config);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("simulate")
+    public ResponseEntity<?> simulate() {
+        simulationService.runSimulation();
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("test")
     public ResponseEntity<?> testSimulation() {
-        simulationService.runSimulation();
+        simulationService.runTestSimulation();
         return ResponseEntity.ok().build();
     }
 }
