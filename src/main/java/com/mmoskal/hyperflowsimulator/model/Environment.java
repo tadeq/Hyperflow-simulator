@@ -32,8 +32,10 @@ public class Environment {
     private Datacenter datacenter;
     private List<Host> hosts;
     private List<Vm> vms;
-    private Map<Vm, Map<Double, Double>> vmsRamUtilizationHistory;
-    private Map<Vm, Map<Double, Double>> vmsBandwidthUtilizationHistory;
+    private Map<Vm, Map<Double, Double>> ramUtilizationHistoryByVm;
+    private Map<Vm, Map<Double, Double>> bandwidthUtilizationHistoryByVm;
+    private Map<Host, Map<Vm, Map<Double, Utilization>>> utilizationHistoryByVmByHost;
+    private Map<Host, Map<Double, Utilization>> utilizationHistoryByHost;
 
     public Environment withHostResourceUtilizationByVmListener() {
         EnvironmentUtilizationService.addHostResourceUtilizationByVmListener(this);
@@ -89,12 +91,23 @@ public class Environment {
 
             environment.broker.submitVmList(environment.vms);
 
-            environment.vmsRamUtilizationHistory = environment.getVms().stream()
-                    .collect(Collectors.toMap(vm -> vm, vm -> new TreeMap<>()));
+            initializeUtilizationMaps(environment);
 
-            environment.vmsBandwidthUtilizationHistory = environment.getVms().stream()
-                    .collect(Collectors.toMap(vm -> vm, vm -> new TreeMap<>()));
             return environment;
+        }
+
+        private void initializeUtilizationMaps(Environment environment) {
+            environment.ramUtilizationHistoryByVm = initializeVmOneResourceUtilizationMap(environment.vms);
+            environment.bandwidthUtilizationHistoryByVm = initializeVmOneResourceUtilizationMap(environment.vms);
+            environment.utilizationHistoryByHost = environment.hosts.stream()
+                    .collect(Collectors.toMap(host -> host, host -> new TreeMap<>()));
+            environment.utilizationHistoryByVmByHost = environment.hosts.stream()
+                    .collect(Collectors.toMap(host -> host, host -> new TreeMap<>()));
+        }
+
+        private Map<Vm, Map<Double, Double>> initializeVmOneResourceUtilizationMap(List<Vm> vms) {
+            return vms.stream()
+                    .collect(Collectors.toMap(vm -> vm, vm -> new TreeMap<>()));
         }
     }
 

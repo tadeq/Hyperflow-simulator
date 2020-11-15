@@ -1,7 +1,6 @@
 package com.mmoskal.hyperflowsimulator.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mmoskal.hyperflowsimulator.client.RedisTaskResolveClient;
 import com.mmoskal.hyperflowsimulator.model.Config;
@@ -35,11 +34,15 @@ public class SimulationService {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private final RedisTaskResolveClient redisClient;
 
-    private final Environment environment;
+    private Environment environment;
 
     @Autowired
     public SimulationService(RedisTaskResolveClient redisClient) {
         this.redisClient = redisClient;
+        initEnvironment();
+    }
+
+    private void initEnvironment() {
         this.environment = Environment.Creator.getSimpleConfiguration()
                 .withHostResourceUtilizationByVmListener()
                 .withVmsUtilizationHistoryListener();
@@ -47,10 +50,6 @@ public class SimulationService {
 
     public void addTask(String config) {
         try {
-//            JsonNode mainNode = OBJECT_MAPPER.readTree(config);
-//            String appId = String.valueOf(mainNode.get("appId").intValue());
-//            String taskId = mainNode.get("taskId").textValue();
-//            environment.getBroker().submitCloudlet(toCloudletWithOnFinishListener(new Config(appId, taskId)));
             environment.getBroker().submitCloudlet(toCloudletWithOnFinishListener(OBJECT_MAPPER.readValue(config, Config.class)));
         } catch (JsonProcessingException e) {
             e.printStackTrace();
@@ -61,8 +60,11 @@ public class SimulationService {
         environment.getCloudsim().start();
         new CloudletsTableBuilder(environment.getBroker().getCloudletFinishedList()).build();
         EnvironmentUtilizationService.showVmsUtilizationHistory(environment);
+        EnvironmentUtilizationService.showHostResourceUtilizationByVm(environment);
         EnvironmentUtilizationService.showCpuUtilizationForHosts(environment.getHosts());
         EnvironmentUtilizationService.showCpuUtilizationForVms(environment.getVms());
+        System.out.println("--------------------END OF SIMULATION--------------------");
+        initEnvironment();
     }
 
     private Cloudlet toCloudletWithOnFinishListener(Config config) {

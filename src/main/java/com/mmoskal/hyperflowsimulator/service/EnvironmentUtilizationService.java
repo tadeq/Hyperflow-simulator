@@ -1,6 +1,7 @@
 package com.mmoskal.hyperflowsimulator.service;
 
 import com.mmoskal.hyperflowsimulator.model.Environment;
+import com.mmoskal.hyperflowsimulator.model.Utilization;
 import lombok.experimental.UtilityClass;
 import org.cloudbus.cloudsim.hosts.Host;
 import org.cloudbus.cloudsim.resources.Bandwidth;
@@ -10,6 +11,7 @@ import org.cloudbus.cloudsim.vms.Vm;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 @UtilityClass
 public class EnvironmentUtilizationService {
@@ -17,17 +19,24 @@ public class EnvironmentUtilizationService {
     public void addHostResourceUtilizationByVmListener(Environment environment) {
         environment.getCloudsim().addOnClockTickListener(eventInfo -> {
             for (Host host : environment.getDatacenter().getHostList()) {
-                System.out.printf("Host %-2d Time: %.0f%n", host.getId(), eventInfo.getTime());
                 for (Vm vm : host.getVmList()) {
-                    System.out.printf(
-                            "\tVm %2d: Host's CPU utilization: %5.0f%% | Host's RAM utilization: %5.0f%% | Host's BW utilization: %5.0f%%%n",
-                            vm.getId(), vm.getHostCpuUtilization() * 100, vm.getHostRamUtilization() * 100, vm.getHostBwUtilization() * 100);
+                    Utilization utilization = Utilization.builder()
+                            .cpuUtilization(vm.getHostCpuUtilization() * 100)
+                            .ramUtilization(vm.getHostRamUtilization() * 100)
+                            .bwUtilization(vm.getHostBwUtilization() * 100)
+                            .build();
+                    Map<Vm, Map<Double, Utilization>> utilizationByVm = environment.getUtilizationHistoryByVmByHost().get(host);
+                    if (!utilizationByVm.containsKey(vm)) {
+                        utilizationByVm.put(vm, new TreeMap<>());
+                    }
+                    utilizationByVm.get(vm).put(eventInfo.getTime(), utilization);
                 }
-                System.out.printf(
-                        "Host %-2d Total Utilization:         %5.0f%% |                         %5.0f%% |                        %5.0f%%%n%n",
-                        host.getId(), host.getCpuPercentUtilization() * 100,
-                        host.getRam().getPercentUtilization() * 100,
-                        host.getBw().getPercentUtilization() * 100);
+                Utilization utilization = Utilization.builder()
+                        .cpuUtilization(host.getCpuPercentUtilization() * 100)
+                        .ramUtilization(host.getRam().getPercentUtilization() * 100)
+                        .bwUtilization(host.getBw().getPercentUtilization() * 100)
+                        .build();
+                environment.getUtilizationHistoryByHost().get(host).put(eventInfo.getTime(), utilization);
             }
         });
     }
@@ -35,33 +44,58 @@ public class EnvironmentUtilizationService {
     public void addVmsUtilizationHistoryListener(Environment environment) {
         environment.getCloudsim().addOnClockTickListener(eventInfo -> {
             for (Vm vm : environment.getVms()) {
-                final Map<Double, Double> vmBandUtilizationHistory = environment.getVmsBandwidthUtilizationHistory().get(vm);
+                final Map<Double, Double> vmBandUtilizationHistory = environment.getBandwidthUtilizationHistoryByVm().get(vm);
                 vmBandUtilizationHistory.put(environment.getCloudsim().clock(), vm.getResource(Bandwidth.class).getPercentUtilization());
-                final Map<Double, Double> vmRamUtilizationHistory = environment.getVmsRamUtilizationHistory().get(vm);
+                final Map<Double, Double> vmRamUtilizationHistory = environment.getRamUtilizationHistoryByVm().get(vm);
                 vmRamUtilizationHistory.put(environment.getCloudsim().clock(), vm.getResource(Ram.class).getPercentUtilization());
             }
         });
     }
 
+    public void showHostResourceUtilizationByVm(Environment environment) {
+        for (Host host : environment.getHosts()) {
+            Map<Double, Utilization> hostUtilizationByTime = environment.getUtilizationHistoryByHost().get(host);
+            Map<Vm, Map<Double, Utilization>> vmsUtilization = environment.getUtilizationHistoryByVmByHost().get(host);
+            Set<Double> timestamps = hostUtilizationByTime.keySet();
+            for (Double time : timestamps) {
+                System.out.printf("Host %-2d Time: %.0f%n", host.getId(), time);
+                for (Vm vm : environment.getVms()) {
+                    if (vmsUtilization.containsKey(vm)) {
+                        Utilization vmUtilization = vmsUtilization.get(vm).get(time);
+                        System.out.printf(
+                                "\tVm %2d: Host's CPU utilization: %5.0f%% | Host's RAM utilization: %5.0f%% | Host's BW utilization: %5.0f%%%n",
+                                vm.getId(), vmUtilization.getCpuUtilization(), vmUtilization.getRamUtilization(), vmUtilization.getBwUtilization());
+                    }
+                }
+                Utilization hostUtilization = hostUtilizationByTime.get(time);
+                System.out.printf(
+                        "Host %-2d Total Utilization:         %5.0f%% |                         %5.0f%% |                        %5.0f%%%n%n",
+                        host.getId(),
+                        hostUtilization.getCpuUtilization(),
+                        hostUtilization.getRamUtilization(),
+                        hostUtilization.getBwUtilization());
+            }
+        }
+    }
+
     public void showVmsUtilizationHistory(Environment environment) {
-        environment.getVms().forEach(vm -> {
+        for (Vm vm : environment.getVms()) {
             System.out.println(vm + " RAM and BW utilization history");
             System.out.println("----------------------------------------------------------------------------------");
 
-            //A set containing all resource utilization collected times
-            final Set<Double> timeSet = environment.getVmsRamUtilizationHistory().get(vm).keySet();
+            final Set<Double> timestamps = environment.getRamUtilizationHistoryByVm().get(vm).keySet();
 
-            final Map<Double, Double> vmRamUtilization = environment.getVmsRamUtilizationHistory().get(vm);
-            final Map<Double, Double> vmBwUtilization = environment.getVmsBandwidthUtilizationHistory().get(vm);
+            final Map<Double, Double> vmRamUtilization = environment.getRamUtilizationHistoryByVm().get(vm);
+            final Map<Double, Double> vmBwUtilization = environment.getBandwidthUtilizationHistoryByVm().get(vm);
 
-            for (final double time : timeSet) {
+            for (final double time : timestamps) {
                 System.out.printf(
                         "Time: %10.1f secs | RAM Utilization: %10.2f%% | BW Utilization: %10.2f%%%n",
                         time, vmRamUtilization.get(time) * 100, vmBwUtilization.get(time) * 100);
             }
 
             System.out.printf("----------------------------------------------------------------------------------%n%n");
-        });
+        }
     }
 
 
