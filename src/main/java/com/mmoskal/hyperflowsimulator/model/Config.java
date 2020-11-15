@@ -1,9 +1,11 @@
 package com.mmoskal.hyperflowsimulator.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.Value;
+import lombok.Data;
 
-@Value
+@Data
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Config {
 
     @JsonProperty("executor")
@@ -16,13 +18,13 @@ public class Config {
     String hfId;
 
     @JsonProperty("appId")
-    int appId;
+    String appId;
 
     @JsonProperty("procId")
-    int procId;
+    String procId;
 
     @JsonProperty("firingId")
-    int firingId;
+    String firingId;
 
     @JsonProperty("taskId")
     String taskId;

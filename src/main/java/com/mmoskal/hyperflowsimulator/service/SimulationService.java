@@ -1,5 +1,9 @@
 package com.mmoskal.hyperflowsimulator.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mmoskal.hyperflowsimulator.client.RedisTaskResolveClient;
 import com.mmoskal.hyperflowsimulator.model.Config;
 import com.mmoskal.hyperflowsimulator.model.Environment;
 import org.cloudbus.cloudsim.allocationpolicies.VmAllocationPolicyBestFit;
@@ -18,38 +22,80 @@ import org.cloudbus.cloudsim.utilizationmodels.UtilizationModelDynamic;
 import org.cloudbus.cloudsim.vms.Vm;
 import org.cloudbus.cloudsim.vms.VmSimple;
 import org.cloudsimplus.builders.tables.CloudletsTableBuilder;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class SimulationService {
 
-    private final List<Config> configs = new ArrayList<>();
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private final RedisTaskResolveClient redisClient;
 
-    public void addConfig(Config config) {
-        configs.add(config);
+    private final Environment environment;
+
+    @Autowired
+    public SimulationService(RedisTaskResolveClient redisClient) {
+        this.redisClient = redisClient;
+        this.environment = Environment.Creator.getSimpleConfiguration()
+                .withHostResourceUtilizationByVmListener()
+                .withVmsUtilizationHistoryListener();
+    }
+
+    public void addTask(String config) {
+        try {
+//            JsonNode mainNode = OBJECT_MAPPER.readTree(config);
+//            String appId = String.valueOf(mainNode.get("appId").intValue());
+//            String taskId = mainNode.get("taskId").textValue();
+//            environment.getBroker().submitCloudlet(toCloudletWithOnFinishListener(new Config(appId, taskId)));
+            environment.getBroker().submitCloudlet(toCloudletWithOnFinishListener(OBJECT_MAPPER.readValue(config, Config.class)));
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
     }
 
     public void runSimulation() {
-        Environment environment = Environment.Creator.getSimpleConfiguration()
-                .withHostResourceUtilizationByVmListener()
-                .withVmsUtilizationHistoryListener();
-
-        UtilizationModelDynamic utilizationModel = new UtilizationModelDynamic(0.4);
-        List<Cloudlet> cloudlets = configs.stream()
-                .map(config -> new CloudletSimple(25000, 1, utilizationModel))
-                .collect(Collectors.toList());
-        environment.getBroker().submitCloudletList(cloudlets);
-
         environment.getCloudsim().start();
-
         new CloudletsTableBuilder(environment.getBroker().getCloudletFinishedList()).build();
         EnvironmentUtilizationService.showVmsUtilizationHistory(environment);
         EnvironmentUtilizationService.showCpuUtilizationForHosts(environment.getHosts());
         EnvironmentUtilizationService.showCpuUtilizationForVms(environment.getVms());
+    }
+
+    private Cloudlet toCloudletWithOnFinishListener(Config config) {
+        UtilizationModelDynamic utilizationModel = new UtilizationModelDynamic(0.4);
+        Cloudlet cloudlet = new CloudletSimple(25000, 1, utilizationModel);
+        cloudlet.addOnFinishListener(eventInfo -> {
+            redisClient.resolveTask(config.getAppId(), config.getTaskId());
+            environment.getCloudsim().pause();
+            System.out.println("SUBMITTED: " + environment.getBroker().getCloudletSubmittedList().size());
+            System.out.println("FINISHED: " + environment.getBroker().getCloudletFinishedList().size());
+            waitForCloudlets();
+            environment.getCloudsim().resume();
+        });
+        return cloudlet;
+    }
+
+    private void waitForCloudlets() {
+        for (int i = 0; i < 4; i++) {
+            int submittedCloudlets = environment.getBroker().getCloudletSubmittedList().size();
+            int finishedCloudlets = environment.getBroker().getCloudletFinishedList().size();
+            long availablePes = environment.getHosts().stream()
+                    .map(Host::getPeList)
+                    .mapToLong(Collection::size)
+                    .sum();
+            if (submittedCloudlets - finishedCloudlets - availablePes <= 0) {
+                System.out.println("WAITING FOR CLOUDLETS");
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 
     public void runTestSimulation() {
