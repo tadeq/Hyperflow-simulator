@@ -86,6 +86,7 @@ public class SimulationService {
             int submittedCloudlets = environment.getBroker().getCloudletSubmittedList().size();
             int finishedCloudlets = environment.getBroker().getCloudletFinishedList().size();
             long availablePes = environment.getHosts().stream()
+                    .filter(Host::isActive)
                     .map(Host::getPeList)
                     .mapToLong(Collection::size)
                     .sum();

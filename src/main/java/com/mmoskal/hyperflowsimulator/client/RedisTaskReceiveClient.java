@@ -3,7 +3,10 @@ package com.mmoskal.hyperflowsimulator.client;
 import com.mmoskal.hyperflowsimulator.service.SimulationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import redis.clients.jedis.*;
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.JedisPoolConfig;
+import redis.clients.jedis.JedisPubSub;
 
 @Component
 public class RedisTaskReceiveClient {
