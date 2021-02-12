@@ -12,8 +12,7 @@ import org.cloudbus.cloudsim.datacenters.DatacenterSimple;
 import org.cloudbus.cloudsim.hosts.Host;
 import org.cloudbus.cloudsim.hosts.HostSimple;
 import org.cloudbus.cloudsim.provisioners.ResourceProvisionerSimple;
-import org.cloudbus.cloudsim.resources.Pe;
-import org.cloudbus.cloudsim.resources.PeSimple;
+import org.cloudbus.cloudsim.resources.*;
 import org.cloudbus.cloudsim.schedulers.cloudlet.CloudletSchedulerSpaceShared;
 import org.cloudbus.cloudsim.schedulers.vm.VmSchedulerTimeShared;
 import org.cloudbus.cloudsim.vms.Vm;
@@ -76,7 +75,11 @@ public class Environment {
             host2.enableStateHistory();
             environment.hosts = List.of(host1, host2);
 
-            environment.datacenter = new DatacenterSimple(environment.cloudsim, environment.hosts, new VmAllocationPolicyBestFit());
+            FileStorage storage = new SanStorage(1000000, 400, 2); //capacity in MBs, bandwidth in Mb/s
+            File file = new File("big_region_20130212_013030_8881.hdr", 100000);
+            storage.addFile(file);
+            DatacenterStorage datacenterStorage = new DatacenterStorage(List.of(storage));
+            environment.datacenter = new DatacenterSimple(environment.cloudsim, environment.hosts, new VmAllocationPolicyBestFit(), datacenterStorage);
             environment.vms = List.of(new VmSimple(500, 2)
                             .setBw(8000)
                             .setRam(8000)

@@ -4,28 +4,18 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Config {
 
-    @JsonProperty("executor")
-    Executor executor;
+    @JsonProperty("context")
+    Context context;
 
-    @JsonProperty("name")
-    String name;
+    @JsonProperty("ins")
+    List<String> ins;
 
-    @JsonProperty("hfId")
-    String hfId;
-
-    @JsonProperty("appId")
-    String appId;
-
-    @JsonProperty("procId")
-    String procId;
-
-    @JsonProperty("firingId")
-    String firingId;
-
-    @JsonProperty("taskId")
-    String taskId;
+    @JsonProperty("outs")
+    List<String> outs;
 }
