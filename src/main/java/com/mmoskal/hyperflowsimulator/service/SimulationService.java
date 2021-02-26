@@ -69,7 +69,7 @@ public class SimulationService {
 
     private Cloudlet toCloudletWithOnFinishListener(Config config) {
         UtilizationModelDynamic utilizationModel = new UtilizationModelDynamic(40);
-        Cloudlet cloudlet = new CloudletSimple(25000, 1, utilizationModel);
+        Cloudlet cloudlet = new CloudletSimple(config.getContext().getExecutor().getInstructions(), 1, utilizationModel);
         cloudlet.addRequiredFile("big_region_20130212_013030_8881.hdr");
         cloudlet.addOnFinishListener(eventInfo -> {
             redisClient.resolveTask(config.getContext().getAppId(), config.getContext().getTaskId());

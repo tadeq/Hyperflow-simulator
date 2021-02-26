@@ -15,4 +15,7 @@ public class Executor {
 
     @JsonProperty("args")
     List<String> args;
+
+    @JsonProperty("instructions")
+    Long instructions;
 }
