@@ -11,5 +11,5 @@ public class Signal {
     String name;
 
     @JsonProperty("size")
-    String size;
+    Double size;
 }

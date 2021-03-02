@@ -75,9 +75,7 @@ public class Environment {
             host2.enableStateHistory();
             environment.hosts = List.of(host1, host2);
 
-            FileStorage storage = new SanStorage(1000000, 400, 2); //capacity in MBs, bandwidth in Mb/s
-            File file = new File("big_region_20130212_013030_8881.hdr", 100000);
-            storage.addFile(file);
+            FileStorage storage = new SanStorage(1000000, 400, 0.1); //capacity in MBs, bandwidth in Mb/s
             DatacenterStorage datacenterStorage = new DatacenterStorage(List.of(storage));
             environment.datacenter = new DatacenterSimple(environment.cloudsim, environment.hosts, new VmAllocationPolicyBestFit(), datacenterStorage);
             environment.vms = List.of(new VmSimple(500, 2)

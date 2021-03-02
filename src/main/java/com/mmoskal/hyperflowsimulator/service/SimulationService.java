@@ -15,6 +15,7 @@ import org.cloudbus.cloudsim.datacenters.Datacenter;
 import org.cloudbus.cloudsim.datacenters.DatacenterSimple;
 import org.cloudbus.cloudsim.hosts.Host;
 import org.cloudbus.cloudsim.hosts.HostSimple;
+import org.cloudbus.cloudsim.resources.File;
 import org.cloudbus.cloudsim.resources.Pe;
 import org.cloudbus.cloudsim.resources.PeSimple;
 import org.cloudbus.cloudsim.utilizationmodels.UtilizationModelDynamic;
@@ -27,6 +28,8 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class SimulationService {
@@ -69,8 +72,19 @@ public class SimulationService {
 
     private Cloudlet toCloudletWithOnFinishListener(Config config) {
         UtilizationModelDynamic utilizationModel = new UtilizationModelDynamic(40);
-        Cloudlet cloudlet = new CloudletSimple(config.getContext().getExecutor().getInstructions(), 1, utilizationModel);
-        cloudlet.addRequiredFile("big_region_20130212_013030_8881.hdr");
+        Cloudlet cloudlet = new CloudletSimple((int) Math.round(config.getContext().getExecutor().getInstructions() / 1000000.0), 1, utilizationModel);
+        List<File> inFiles = config.getIns().stream()
+                .map(in -> Optional.ofNullable(in.getSize())
+                        .map(size -> (int) Math.round(size))
+                        .filter(size -> size > 0)
+                        .map(size -> new File(in.getName(), size)))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .collect(Collectors.toList());
+        inFiles.forEach(file -> {
+            environment.getDatacenter().getDatacenterStorage().addFile(file);
+            cloudlet.addRequiredFile(file.getName());
+        });
         cloudlet.addOnFinishListener(eventInfo -> {
             redisClient.resolveTask(config.getContext().getAppId(), config.getContext().getTaskId());
             environment.getCloudsim().pause();
