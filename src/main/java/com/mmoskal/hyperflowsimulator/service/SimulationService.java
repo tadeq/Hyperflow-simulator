@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mmoskal.hyperflowsimulator.client.RedisTaskResolveClient;
 import com.mmoskal.hyperflowsimulator.model.Config;
 import com.mmoskal.hyperflowsimulator.model.Environment;
+import com.mmoskal.hyperflowsimulator.model.Signal;
 import org.cloudbus.cloudsim.allocationpolicies.VmAllocationPolicyBestFit;
 import org.cloudbus.cloudsim.brokers.DatacenterBroker;
 import org.cloudbus.cloudsim.brokers.DatacenterBrokerSimple;
@@ -72,8 +73,28 @@ public class SimulationService {
 
     private Cloudlet toCloudletWithOnFinishListener(Config config) {
         UtilizationModelDynamic utilizationModel = new UtilizationModelDynamic(40);
-        Cloudlet cloudlet = new CloudletSimple((int) Math.round(config.getContext().getExecutor().getInstructions() / 1000000.0), 1, utilizationModel);
-        List<File> inFiles = config.getIns().stream()
+        Cloudlet cloudlet = new CloudletSimple(calculateCloudletInstructions(config), 1, utilizationModel);
+        List<File> inFiles = mapToInputFiles(config.getIns());
+        inFiles.forEach(file -> {
+            environment.getDatacenter().getDatacenterStorage().addFile(file);
+            cloudlet.addRequiredFile(file.getName());
+        });
+        cloudlet.addOnFinishListener(eventInfo -> notifyCompletionAndWaitForCloudlets(config));
+        return cloudlet;
+    }
+
+    private int calculateCloudletInstructions(Config config) {
+        double avgMipsCapacity = environment.getHosts().stream()
+                .map(Host::getPeList)
+                .flatMap(Collection::stream)
+                .mapToLong(Pe::getCapacity)
+                .average()
+                .orElse(0);
+        return (int) Math.round(config.getContext().getExecutor().getInstructions() / 1000000.0 + avgMipsCapacity * 2.5);
+    }
+
+    private List<File> mapToInputFiles(List<Signal> inputs) {
+        return inputs.stream()
                 .map(in -> Optional.ofNullable(in.getSize())
                         .map(size -> (int) Math.round(size))
                         .filter(size -> size > 0)
@@ -81,23 +102,19 @@ public class SimulationService {
                 .filter(Optional::isPresent)
                 .map(Optional::get)
                 .collect(Collectors.toList());
-        inFiles.forEach(file -> {
-            environment.getDatacenter().getDatacenterStorage().addFile(file);
-            cloudlet.addRequiredFile(file.getName());
-        });
-        cloudlet.addOnFinishListener(eventInfo -> {
-            redisClient.resolveTask(config.getContext().getAppId(), config.getContext().getTaskId());
-            environment.getCloudsim().pause();
-            System.out.println("SUBMITTED: " + environment.getBroker().getCloudletSubmittedList().size());
-            System.out.println("FINISHED: " + environment.getBroker().getCloudletFinishedList().size());
-            waitForCloudlets();
-            environment.getCloudsim().resume();
-        });
-        return cloudlet;
+    }
+
+    private void notifyCompletionAndWaitForCloudlets(Config config) {
+        redisClient.resolveTask(config.getContext().getAppId(), config.getContext().getTaskId());
+        environment.getCloudsim().pause();
+        System.out.println("SUBMITTED: " + environment.getBroker().getCloudletSubmittedList().size());
+        System.out.println("FINISHED: " + environment.getBroker().getCloudletFinishedList().size());
+        waitForCloudlets();
+        environment.getCloudsim().resume();
     }
 
     private void waitForCloudlets() {
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 3; i++) {
             int submittedCloudlets = environment.getBroker().getCloudletSubmittedList().size();
             int finishedCloudlets = environment.getBroker().getCloudletFinishedList().size();
             long availablePes = environment.getHosts().stream()

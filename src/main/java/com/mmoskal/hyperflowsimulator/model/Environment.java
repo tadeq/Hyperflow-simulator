@@ -54,12 +54,16 @@ public class Environment {
             environment.broker = new DatacenterBrokerSimple(environment.cloudsim);
 
             List<Pe> pes1 = List.of(
-                    new PeSimple(10000),
-                    new PeSimple(10000),
-                    new PeSimple(10000),
-                    new PeSimple(10000)
+                    new PeSimple(2500),
+                    new PeSimple(2500),
+                    new PeSimple(2500),
+                    new PeSimple(2500),
+                    new PeSimple(2500),
+                    new PeSimple(2500),
+                    new PeSimple(2500),
+                    new PeSimple(2500)
             );
-            Host host1 = new HostSimple(32_000, 128_000, 128_000, pes1)
+            Host host1 = new HostSimple(16_000, 5_000, 128_000, pes1)
                     .setBwProvisioner(new ResourceProvisionerSimple())
                     .setRamProvisioner(new ResourceProvisionerSimple())
                     .setVmScheduler(new VmSchedulerTimeShared());
@@ -73,21 +77,27 @@ public class Environment {
                     .setRamProvisioner(new ResourceProvisionerSimple())
                     .setVmScheduler(new VmSchedulerTimeShared());
             host2.enableStateHistory();
-            environment.hosts = List.of(host1, host2);
+//            environment.hosts = List.of(host1, host2);
+            environment.hosts = List.of(host1);
 
-            FileStorage storage = new SanStorage(1000000, 400, 0.1); //capacity in MBs, bandwidth in Mb/s
+            FileStorage storage = new SanStorage(1000000, 5000, 0.01); //capacity in MBs, bandwidth in Mb/s
             DatacenterStorage datacenterStorage = new DatacenterStorage(List.of(storage));
             environment.datacenter = new DatacenterSimple(environment.cloudsim, environment.hosts, new VmAllocationPolicyBestFit(), datacenterStorage);
-            environment.vms = List.of(new VmSimple(500, 2)
-                            .setBw(8000)
-                            .setRam(8000)
-                            .setSize(1000)
-                            .setCloudletScheduler(new CloudletSchedulerSpaceShared()),
-                    new VmSimple(1000, 4)
-                            .setBw(16000)
-                            .setRam(12000)
-                            .setSize(4000)
-                            .setCloudletScheduler(new CloudletSchedulerSpaceShared()));
+            environment.vms = List.of(new VmSimple(2500, 8)
+                    .setBw(1250)
+                    .setRam(4000)
+                    .setSize(1000)
+                    .setCloudletScheduler(new CloudletSchedulerSpaceShared()));
+//            environment.vms = List.of(new VmSimple(500, 2)
+//                            .setBw(8000)
+//                            .setRam(8000)
+//                            .setSize(1000)
+//                            .setCloudletScheduler(new CloudletSchedulerSpaceShared()),
+//                    new VmSimple(1000, 4)
+//                            .setBw(16000)
+//                            .setRam(12000)
+//                            .setSize(4000)
+//                            .setCloudletScheduler(new CloudletSchedulerSpaceShared()));
             environment.vms.forEach(vm -> vm.getUtilizationHistory().enable());
 
             environment.broker.submitVmList(environment.vms);

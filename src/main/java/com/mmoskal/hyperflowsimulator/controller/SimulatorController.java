@@ -2,6 +2,7 @@ package com.mmoskal.hyperflowsimulator.controller;
 
 import com.mmoskal.hyperflowsimulator.service.SimulationService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,8 +19,12 @@ public class SimulatorController {
 
     @GetMapping("simulate")
     public ResponseEntity<?> simulate() {
-        simulationService.runSimulation();
-        return ResponseEntity.ok().build();
+        try {
+            simulationService.runSimulation();
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+        }
     }
 
     @GetMapping("test")
