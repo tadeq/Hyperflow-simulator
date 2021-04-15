@@ -1,4 +1,4 @@
-package com.mmoskal.hyperflowsimulator.model;
+package com.mmoskal.hyperflowsimulator.model.hyperflow;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -18,4 +18,10 @@ public class Executor {
 
     @JsonProperty("instructions")
     Long instructions;
+
+    @JsonProperty("memRequest")
+    Long memRequest;
+
+    @JsonProperty("cpuRequest")
+    Long cpuRequest;
 }

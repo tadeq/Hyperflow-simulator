@@ -5,6 +5,7 @@ import com.mmoskal.hyperflowsimulator.model.Utilization;
 import lombok.experimental.UtilityClass;
 import org.cloudbus.cloudsim.hosts.Host;
 import org.cloudbus.cloudsim.resources.Bandwidth;
+import org.cloudbus.cloudsim.resources.Processor;
 import org.cloudbus.cloudsim.resources.Ram;
 import org.cloudbus.cloudsim.vms.Vm;
 
@@ -48,6 +49,8 @@ public class EnvironmentUtilizationService {
                 vmBandUtilizationHistory.put(environment.getCloudsim().clock(), vm.getResource(Bandwidth.class).getPercentUtilization());
                 final Map<Double, Double> vmRamUtilizationHistory = environment.getRamUtilizationHistoryByVm().get(vm);
                 vmRamUtilizationHistory.put(environment.getCloudsim().clock(), vm.getResource(Ram.class).getPercentUtilization());
+                final Map<Double, Double> vmCpuUtilizationHistory = environment.getCpuUtilizationHistoryByVm().get(vm);
+                vmCpuUtilizationHistory.put(environment.getCloudsim().clock(), vm.getResource(Processor.class).getPercentUtilization());
             }
         });
     }
@@ -87,11 +90,12 @@ public class EnvironmentUtilizationService {
 
             final Map<Double, Double> vmRamUtilization = environment.getRamUtilizationHistoryByVm().get(vm);
             final Map<Double, Double> vmBwUtilization = environment.getBandwidthUtilizationHistoryByVm().get(vm);
+            final Map<Double, Double> vmCpuUtilization = environment.getCpuUtilizationHistoryByVm().get(vm);
 
             for (final double time : timestamps) {
                 System.out.printf(
-                        "Time: %10.1f secs | RAM Utilization: %10.2f%% | BW Utilization: %10.2f%%%n",
-                        time, vmRamUtilization.get(time) * 100, vmBwUtilization.get(time) * 100);
+                        "Time: %10.1f secs | RAM Utilization: %10.2f%% | CPU Utilization: %10.2f%% | BW Utilization: %10.2f%%%n",
+                        time, vmRamUtilization.get(time) * 100, vmCpuUtilization.get(time) * 100, vmBwUtilization.get(time) * 100);
             }
 
             System.out.printf("----------------------------------------------------------------------------------%n%n");

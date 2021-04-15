@@ -1,4 +1,4 @@
-package com.mmoskal.hyperflowsimulator.model;
+package com.mmoskal.hyperflowsimulator.model.hyperflow;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;

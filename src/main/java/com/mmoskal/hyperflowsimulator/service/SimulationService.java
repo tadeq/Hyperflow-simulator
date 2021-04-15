@@ -3,9 +3,10 @@ package com.mmoskal.hyperflowsimulator.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mmoskal.hyperflowsimulator.client.RedisTaskResolveClient;
-import com.mmoskal.hyperflowsimulator.model.Config;
 import com.mmoskal.hyperflowsimulator.model.Environment;
-import com.mmoskal.hyperflowsimulator.model.Signal;
+import com.mmoskal.hyperflowsimulator.model.envconfig.EnvironmentConfig;
+import com.mmoskal.hyperflowsimulator.model.hyperflow.Config;
+import com.mmoskal.hyperflowsimulator.model.hyperflow.Signal;
 import org.cloudbus.cloudsim.allocationpolicies.VmAllocationPolicyBestFit;
 import org.cloudbus.cloudsim.brokers.DatacenterBroker;
 import org.cloudbus.cloudsim.brokers.DatacenterBrokerSimple;
@@ -39,17 +40,16 @@ public class SimulationService {
     private final RedisTaskResolveClient redisClient;
 
     private Environment environment;
+    private EnvironmentConfig environmentConfig;
 
     @Autowired
     public SimulationService(RedisTaskResolveClient redisClient) {
         this.redisClient = redisClient;
-        initEnvironment();
     }
 
-    private void initEnvironment() {
-        this.environment = Environment.Creator.getSimpleConfiguration()
-                .withHostResourceUtilizationByVmListener()
-                .withVmsUtilizationHistoryListener();
+    public void initEnvironment(EnvironmentConfig environmentConfig) {
+        this.environmentConfig = environmentConfig;
+        this.environment = EnvironmentConfigMapper.mapToEnvironment(environmentConfig);
     }
 
     public void addTask(String config) {
@@ -68,7 +68,7 @@ public class SimulationService {
         EnvironmentUtilizationService.showCpuUtilizationForHosts(environment.getHosts());
         EnvironmentUtilizationService.showCpuUtilizationForVms(environment.getVms());
         System.out.println("--------------------END OF SIMULATION--------------------");
-        initEnvironment();
+        initEnvironment(environmentConfig);
     }
 
     private Cloudlet toCloudletWithOnFinishListener(Config config) {
