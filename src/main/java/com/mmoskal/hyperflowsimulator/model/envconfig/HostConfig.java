@@ -19,6 +19,6 @@ public class HostConfig {
     @JsonProperty("storage")
     private Long storage;
 
-    @JsonProperty("pesMipsCapacities")
+    @JsonProperty("pes")
     private List<Long> pesMipsCapacities;
 }

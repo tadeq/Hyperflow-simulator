@@ -17,13 +17,13 @@ public class Context {
     String hfId;
 
     @JsonProperty("appId")
-    String appId;
+    Long appId;
 
     @JsonProperty("procId")
-    String procId;
+    Long procId;
 
     @JsonProperty("firingId")
-    String firingId;
+    Long firingId;
 
     @JsonProperty("taskId")
     String taskId;

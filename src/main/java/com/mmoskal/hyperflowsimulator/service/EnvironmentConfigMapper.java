@@ -3,6 +3,8 @@ package com.mmoskal.hyperflowsimulator.service;
 import com.mmoskal.hyperflowsimulator.model.Environment;
 import com.mmoskal.hyperflowsimulator.model.Utilization;
 import com.mmoskal.hyperflowsimulator.model.envconfig.EnvironmentConfig;
+import com.mmoskal.hyperflowsimulator.model.envconfig.HostConfig;
+import com.mmoskal.hyperflowsimulator.model.envconfig.VmConfig;
 import lombok.experimental.UtilityClass;
 import org.cloudbus.cloudsim.allocationpolicies.VmAllocationPolicyBestFit;
 import org.cloudbus.cloudsim.brokers.DatacenterBroker;
@@ -59,7 +61,7 @@ public class EnvironmentConfigMapper {
                 .withVmsUtilizationHistoryListener();
     }
 
-    private Host mapToHost(com.mmoskal.hyperflowsimulator.model.envconfig.HostConfig hostConfig) {
+    private Host mapToHost(HostConfig hostConfig) {
         List<Pe> pes = hostConfig.getPesMipsCapacities().stream()
                 .map(PeSimple::new)
                 .collect(Collectors.toList());
@@ -71,7 +73,7 @@ public class EnvironmentConfigMapper {
         return host;
     }
 
-    private Vm mapToVm(com.mmoskal.hyperflowsimulator.model.envconfig.VmConfig vmConfig) {
+    private Vm mapToVm(VmConfig vmConfig) {
         return new VmSimple(vmConfig.getMipsCapacity(), vmConfig.getNumberOfPes())
                 .setBw(vmConfig.getBw())
                 .setRam(vmConfig.getRam())

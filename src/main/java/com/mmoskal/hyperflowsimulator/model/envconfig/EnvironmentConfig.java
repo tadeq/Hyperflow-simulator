@@ -18,5 +18,4 @@ public class EnvironmentConfig {
 
     @JsonProperty("vms")
     private List<VmConfig> vms;
-
 }

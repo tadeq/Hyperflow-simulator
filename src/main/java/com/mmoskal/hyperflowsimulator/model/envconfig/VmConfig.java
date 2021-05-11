@@ -22,5 +22,4 @@ public class VmConfig {
 
     @JsonProperty("size")
     private Long size;
-
 }

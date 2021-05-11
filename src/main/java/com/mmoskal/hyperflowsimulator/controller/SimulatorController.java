@@ -7,8 +7,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+
+import java.util.Optional;
 
 @Controller
 public class SimulatorController {
@@ -22,6 +24,9 @@ public class SimulatorController {
 
     @GetMapping("simulate")
     public ResponseEntity<?> simulate() {
+        if (!simulationService.isEnvironmentInitialized()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Environment not initialized");
+        }
         try {
             simulationService.runSimulation();
             return ResponseEntity.ok().build();
@@ -30,10 +35,17 @@ public class SimulatorController {
         }
     }
 
-    @PostMapping("environment/configure")
-    public ResponseEntity<?> configureEnvironment(@RequestBody EnvironmentConfig environmentConfig) {
+    @PutMapping("environment/config")
+    public ResponseEntity<?> updateEnvironmentConfig(@RequestBody EnvironmentConfig environmentConfig) {
         simulationService.initEnvironment(environmentConfig);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("environment/config")
+    public ResponseEntity<?> getCurrentEnvironmentConfig() {
+        return Optional.ofNullable(simulationService.getEnvironmentConfig())
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @GetMapping("test")

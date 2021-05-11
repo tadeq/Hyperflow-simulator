@@ -16,5 +16,4 @@ public class StorageConfig {
 
     @JsonProperty("latency")
     private Double latency;
-
 }

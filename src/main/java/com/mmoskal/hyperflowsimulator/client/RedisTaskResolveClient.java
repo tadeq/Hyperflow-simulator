@@ -10,7 +10,7 @@ public class RedisTaskResolveClient {
 
     private final JedisPool jedisPool = new JedisPool(new JedisPoolConfig(), "localhost", 6379);
 
-    public void resolveTask(String wfId, String taskId) {
+    public void resolveTask(Long wfId, String taskId) {
         new Thread(() -> {
             Jedis jedis = jedisPool.getResource();
             jedis.sadd("wf:" + wfId + ":tasksPendingCompletionHandling", taskId);

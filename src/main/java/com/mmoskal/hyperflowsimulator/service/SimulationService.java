@@ -6,7 +6,9 @@ import com.mmoskal.hyperflowsimulator.client.RedisTaskResolveClient;
 import com.mmoskal.hyperflowsimulator.model.Environment;
 import com.mmoskal.hyperflowsimulator.model.envconfig.EnvironmentConfig;
 import com.mmoskal.hyperflowsimulator.model.hyperflow.Config;
+import com.mmoskal.hyperflowsimulator.model.hyperflow.Executor;
 import com.mmoskal.hyperflowsimulator.model.hyperflow.Signal;
+import lombok.Getter;
 import org.cloudbus.cloudsim.allocationpolicies.VmAllocationPolicyBestFit;
 import org.cloudbus.cloudsim.brokers.DatacenterBroker;
 import org.cloudbus.cloudsim.brokers.DatacenterBrokerSimple;
@@ -20,6 +22,7 @@ import org.cloudbus.cloudsim.hosts.HostSimple;
 import org.cloudbus.cloudsim.resources.File;
 import org.cloudbus.cloudsim.resources.Pe;
 import org.cloudbus.cloudsim.resources.PeSimple;
+import org.cloudbus.cloudsim.utilizationmodels.UtilizationModel;
 import org.cloudbus.cloudsim.utilizationmodels.UtilizationModelDynamic;
 import org.cloudbus.cloudsim.vms.Vm;
 import org.cloudbus.cloudsim.vms.VmSimple;
@@ -27,10 +30,7 @@ import org.cloudsimplus.builders.tables.CloudletsTableBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,7 +40,9 @@ public class SimulationService {
     private final RedisTaskResolveClient redisClient;
 
     private Environment environment;
+    @Getter
     private EnvironmentConfig environmentConfig;
+    private Map<Long, Config> jobsHistory;
 
     @Autowired
     public SimulationService(RedisTaskResolveClient redisClient) {
@@ -50,11 +52,18 @@ public class SimulationService {
     public void initEnvironment(EnvironmentConfig environmentConfig) {
         this.environmentConfig = environmentConfig;
         this.environment = EnvironmentConfigMapper.mapToEnvironment(environmentConfig);
+        this.jobsHistory = new HashMap<>();
+    }
+
+    public boolean isEnvironmentInitialized() {
+        return environment != null;
     }
 
     public void addTask(String config) {
         try {
-            environment.getBroker().submitCloudlet(toCloudletWithOnFinishListener(OBJECT_MAPPER.readValue(config, Config.class)));
+            Config configJson = OBJECT_MAPPER.readValue(config, Config.class);
+            environment.getBroker().submitCloudlet(toCloudletWithOnFinishListener(configJson));
+            jobsHistory.put(configJson.getContext().getProcId(), configJson);
         } catch (JsonProcessingException e) {
             e.printStackTrace();
         }
@@ -68,12 +77,16 @@ public class SimulationService {
         EnvironmentUtilizationService.showCpuUtilizationForHosts(environment.getHosts());
         EnvironmentUtilizationService.showCpuUtilizationForVms(environment.getVms());
         System.out.println("--------------------END OF SIMULATION--------------------");
+        LogGenerator.generate(environment, jobsHistory);
         initEnvironment(environmentConfig);
     }
 
     private Cloudlet toCloudletWithOnFinishListener(Config config) {
-        UtilizationModelDynamic utilizationModel = new UtilizationModelDynamic(40);
-        Cloudlet cloudlet = new CloudletSimple(calculateCloudletInstructions(config), 1, utilizationModel);
+        Cloudlet cloudlet = new CloudletSimple(calculateCloudletInstructions(config), 1);
+        cloudlet.setId(config.getContext().getProcId());
+        Executor executor = config.getContext().getExecutor();
+        cloudlet.setUtilizationModelCpu(new UtilizationModelDynamic(UtilizationModel.Unit.ABSOLUTE, executor.getCpuRequest()));
+        cloudlet.setUtilizationModelRam(new UtilizationModelDynamic(UtilizationModel.Unit.ABSOLUTE, executor.getMemRequest()));
         List<File> inFiles = mapToInputFiles(config.getIns());
         inFiles.forEach(file -> {
             environment.getDatacenter().getDatacenterStorage().addFile(file);
@@ -90,7 +103,7 @@ public class SimulationService {
                 .mapToLong(Pe::getCapacity)
                 .average()
                 .orElse(0);
-        return (int) Math.round(config.getContext().getExecutor().getInstructions() / 1000000.0 + avgMipsCapacity * 2.5);
+        return (int) Math.round(config.getContext().getExecutor().getInstructions() / 1000000.0);
     }
 
     private List<File> mapToInputFiles(List<Signal> inputs) {
@@ -107,8 +120,6 @@ public class SimulationService {
     private void notifyCompletionAndWaitForCloudlets(Config config) {
         redisClient.resolveTask(config.getContext().getAppId(), config.getContext().getTaskId());
         environment.getCloudsim().pause();
-        System.out.println("SUBMITTED: " + environment.getBroker().getCloudletSubmittedList().size());
-        System.out.println("FINISHED: " + environment.getBroker().getCloudletFinishedList().size());
         waitForCloudlets();
         environment.getCloudsim().resume();
     }
@@ -122,6 +133,9 @@ public class SimulationService {
                     .map(Host::getPeList)
                     .mapToLong(Collection::size)
                     .sum();
+            System.out.println("SUBMITTED: " + environment.getBroker().getCloudletSubmittedList().size());
+            System.out.println("FINISHED: " + environment.getBroker().getCloudletFinishedList().size());
+            System.out.println("PES: " + availablePes);
             if (submittedCloudlets - finishedCloudlets - availablePes <= 0) {
                 System.out.println("WAITING FOR CLOUDLETS");
                 try {
