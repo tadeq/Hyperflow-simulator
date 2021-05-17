@@ -1,6 +1,7 @@
 package com.mmoskal.hyperflowsimulator.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mmoskal.hyperflowsimulator.client.RedisTaskResolveClient;
 import com.mmoskal.hyperflowsimulator.model.Environment;
@@ -43,6 +44,7 @@ public class SimulationService {
     @Getter
     private EnvironmentConfig environmentConfig;
     private Map<Long, Config> jobsHistory;
+    private List<List<Config>> jobGroups;
 
     @Autowired
     public SimulationService(RedisTaskResolveClient redisClient) {
@@ -53,17 +55,31 @@ public class SimulationService {
         this.environmentConfig = environmentConfig;
         this.environment = EnvironmentConfigMapper.mapToEnvironment(environmentConfig);
         this.jobsHistory = new HashMap<>();
+        this.jobGroups = new ArrayList<>();
     }
 
     public boolean isEnvironmentInitialized() {
         return environment != null;
     }
 
-    public void addTask(String config) {
+    public void addTask(String configJson) {
         try {
-            Config configJson = OBJECT_MAPPER.readValue(config, Config.class);
-            environment.getBroker().submitCloudlet(toCloudletWithOnFinishListener(configJson));
-            jobsHistory.put(configJson.getContext().getProcId(), configJson);
+            List<Config> configs = OBJECT_MAPPER.readValue(configJson, new TypeReference<List<Config>>() {
+            });
+            Optional<Vm> vmWithLeastCloudlets = environment.getBroker().getCloudletSubmittedList().stream()
+                    .map(Cloudlet::getVm)
+                    .collect(Collectors.groupingBy(vm -> vm))
+                    .entrySet().stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().size()))
+                    .entrySet().stream()
+                    .min((entry1, entry2) -> entry1.getValue() > entry2.getValue() ? 1 : -1)
+                    .map(Map.Entry::getKey)
+                    .filter(vm -> configs.size() > 1);
+            vmWithLeastCloudlets.ifPresentOrElse(
+                    vm -> environment.getBroker().submitCloudletList(toCloudletsListWithOnFinishListeners(configs), vm),
+                    () -> environment.getBroker().submitCloudletList(toCloudletsListWithOnFinishListeners(configs)));
+            configs.forEach(config -> jobsHistory.put(config.getContext().getProcId(), config));
+            jobGroups.add(configs);
         } catch (JsonProcessingException e) {
             e.printStackTrace();
         }
@@ -77,32 +93,28 @@ public class SimulationService {
         EnvironmentUtilizationService.showCpuUtilizationForHosts(environment.getHosts());
         EnvironmentUtilizationService.showCpuUtilizationForVms(environment.getVms());
         System.out.println("--------------------END OF SIMULATION--------------------");
-        LogGenerator.generate(environment, jobsHistory);
+        LogGenerator.generate(environment, jobsHistory, jobGroups);
         initEnvironment(environmentConfig);
     }
 
-    private Cloudlet toCloudletWithOnFinishListener(Config config) {
-        Cloudlet cloudlet = new CloudletSimple(calculateCloudletInstructions(config), 1);
-        cloudlet.setId(config.getContext().getProcId());
-        Executor executor = config.getContext().getExecutor();
-        cloudlet.setUtilizationModelCpu(new UtilizationModelDynamic(UtilizationModel.Unit.ABSOLUTE, executor.getCpuRequest()));
-        cloudlet.setUtilizationModelRam(new UtilizationModelDynamic(UtilizationModel.Unit.ABSOLUTE, executor.getMemRequest()));
-        List<File> inFiles = mapToInputFiles(config.getIns());
-        inFiles.forEach(file -> {
-            environment.getDatacenter().getDatacenterStorage().addFile(file);
-            cloudlet.addRequiredFile(file.getName());
-        });
-        cloudlet.addOnFinishListener(eventInfo -> notifyCompletionAndWaitForCloudlets(config));
-        return cloudlet;
+    private List<Cloudlet> toCloudletsListWithOnFinishListeners(List<Config> configs) {
+        return configs.stream().map(config -> {
+            Cloudlet cloudlet = new CloudletSimple(calculateCloudletInstructions(config), 1);
+            cloudlet.setId(config.getContext().getProcId());
+            Executor executor = config.getContext().getExecutor();
+            cloudlet.setUtilizationModelCpu(new UtilizationModelDynamic(UtilizationModel.Unit.ABSOLUTE, executor.getCpuRequest()));
+            cloudlet.setUtilizationModelRam(new UtilizationModelDynamic(UtilizationModel.Unit.ABSOLUTE, executor.getMemRequest()));
+            List<File> inFiles = mapToInputFiles(config.getIns());
+            inFiles.forEach(file -> {
+                environment.getDatacenter().getDatacenterStorage().addFile(file);
+                cloudlet.addRequiredFile(file.getName());
+            });
+            cloudlet.addOnFinishListener(eventInfo -> notifyCompletionAndWaitForCloudlets(config));
+            return cloudlet;
+        }).collect(Collectors.toList());
     }
 
     private int calculateCloudletInstructions(Config config) {
-        double avgMipsCapacity = environment.getHosts().stream()
-                .map(Host::getPeList)
-                .flatMap(Collection::stream)
-                .mapToLong(Pe::getCapacity)
-                .average()
-                .orElse(0);
         return (int) Math.round(config.getContext().getExecutor().getInstructions() / 1000000.0);
     }
 
@@ -125,7 +137,7 @@ public class SimulationService {
     }
 
     private void waitForCloudlets() {
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 5; i++) {
             int submittedCloudlets = environment.getBroker().getCloudletSubmittedList().size();
             int finishedCloudlets = environment.getBroker().getCloudletFinishedList().size();
             long availablePes = environment.getHosts().stream()

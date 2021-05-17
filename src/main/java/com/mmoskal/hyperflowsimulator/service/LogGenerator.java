@@ -28,14 +28,13 @@ public class LogGenerator {
 
     private ObjectMapper objectMapper = new ObjectMapper();
 
-    public void generate(Environment environment, Map<Long, Config> jobsHistory) {
+    public void generate(Environment environment, Map<Long, Config> jobsHistory, List<List<Config>> jobGroups) {
         if (jobsHistory.isEmpty()) {
             return;
         }
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSS");
         LocalDateTime startTime = LocalDateTime.now();
         List<Cloudlet> finishedCloudlets = environment.getBroker().getCloudletFinishedList();
-        System.out.println(finishedCloudlets.size());
         Map<Long, Long> finishedCloudletsByVm = LongStream.range(0, environment.getVms().size())
                 .boxed()
                 .collect(Collectors.toMap(vmId -> vmId, vmId -> 0L));
@@ -100,14 +99,14 @@ public class LogGenerator {
             config.getIns().forEach(in -> {
                 ObjectNode signalNode = objectMapper.createObjectNode();
                 signalNode.put("name", in.getName());
-                signalNode.put("size", Optional.ofNullable(in.getSize()).map(size -> size*1000000).orElse(0.0));
+                signalNode.put("size", Optional.ofNullable(in.getSize()).map(size -> size * 1000000).orElse(0.0));
                 inputsNode.add(signalNode);
             });
             ArrayNode outputsNode = jobDescriptionsMainNode.putArray("outputs");
-              config.getOuts().forEach(out -> {
+            config.getOuts().forEach(out -> {
                 ObjectNode signalNode = objectMapper.createObjectNode();
                 signalNode.put("name", out.getName());
-                signalNode.put("size", Optional.ofNullable(out.getSize()).map(size -> size*1000000).orElse(0.0));
+                signalNode.put("size", Optional.ofNullable(out.getSize()).map(size -> size * 1000000).orElse(0.0));
                 outputsNode.add(signalNode);
             });
             jobDescriptionsMainNode.put("name", config.getContext().getName());
@@ -122,26 +121,16 @@ public class LogGenerator {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            finishedCloudletsByVm.put(cloudlet.getVm().getId(), finishedCloudletsByVm.get(cloudlet.getVm().getId()) + 1);
+            boolean isLastCloudletInGroup = jobGroups.stream()
+                    .filter(jobGroup -> !jobGroup.isEmpty())
+                    .map(jobGroup -> jobGroup.get(jobGroup.size() - 1))
+                    .anyMatch(lastCloudletInGroup -> lastCloudletInGroup.getContext().getProcId().equals(cloudlet.getId()));
+            System.out.println("CLOUDLET " + cloudlet.getId() + " " + config.getContext().getName() + " IS LAST? " + isLastCloudletInGroup);
+            System.out.println("FINISHED BY VM  " + finishedCloudletsByVm.get(cloudlet.getVm().getId()));
+            if (isLastCloudletInGroup) {
+                finishedCloudletsByVm.put(cloudlet.getVm().getId(), finishedCloudletsByVm.get(cloudlet.getVm().getId()) + 1);
+            }
         });
-//        addColumnDataFunction(getTable().addColumn("Cloudlet", ID), Identifiable::getId);
-//        addColumnDataFunction(getTable().addColumn("Status "), cloudlet -> cloudlet.getStatus().name());
-//        addColumnDataFunction(getTable().addColumn("DC", ID), cloudlet -> cloudlet.getVm().getHost().getDatacenter().getId());
-//        addColumnDataFunction(getTable().addColumn("Host", ID), cloudlet -> cloudlet.getVm().getHost().getId());
-//        addColumnDataFunction(getTable().addColumn("Host PEs ", CPU_CORES), cloudlet -> cloudlet.getVm().getHost().getWorkingPesNumber());
-//        addColumnDataFunction(getTable().addColumn("VM", ID), cloudlet -> cloudlet.getVm().getId());
-//        addColumnDataFunction(getTable().addColumn("VM PEs   ", CPU_CORES), cloudlet -> cloudlet.getVm().getNumberOfPes());
-//        addColumnDataFunction(getTable().addColumn("CloudletLen", "MI"), Cloudlet::getLength);
-//        addColumnDataFunction(getTable().addColumn("CloudletPEs", CPU_CORES), Cloudlet::getNumberOfPes);
-//
-//        TableColumn col = getTable().addColumn("StartTime", SECONDS).setFormat(TIME_FORMAT);
-//        addColumnDataFunction(col, Cloudlet::getExecStartTime);
-//
-//        col = getTable().addColumn("FinishTime", SECONDS).setFormat(TIME_FORMAT);
-//        addColumnDataFunction(col, cl -> roundTime(cl, cl.getFinishTime()));
-//
-//        col = getTable().addColumn("ExecTime", SECONDS).setFormat(TIME_FORMAT);
-//        addColumnDataFunction(col, cl -> roundTime(cl, cl.getActualCpuTime()));
     }
 
 }
