@@ -9,10 +9,14 @@ import org.cloudbus.cloudsim.resources.Processor;
 import org.cloudbus.cloudsim.resources.Ram;
 import org.cloudbus.cloudsim.vms.Vm;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @UtilityClass
 public class EnvironmentUtilizationService {
@@ -78,6 +82,30 @@ public class EnvironmentUtilizationService {
                         hostUtilization.getRamUtilization(),
                         hostUtilization.getBwUtilization());
             }
+        }
+    }
+
+    public void saveHostResourceUtilization(Environment environment) {
+        try {
+            FileWriter fileWriter = new FileWriter("res_utilization.csv", false);
+            fileWriter.write("host,time,cpu,ram\n");
+            environment.getHosts()
+                    .forEach(host -> environment.getUtilizationHistoryByHost()
+                            .get(host).forEach((timestamp, utilization) -> writeCsvLine(fileWriter, host, timestamp, utilization)));
+            fileWriter.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void writeCsvLine(FileWriter fileWriter, Host host, Double timestamp, Utilization utilization) {
+        try {
+            fileWriter.write(Stream.of(
+                    host.getId(), timestamp, utilization.getCpuUtilization(), utilization.getRamUtilization() + "\n"
+            ).map(String::valueOf)
+                    .collect(Collectors.joining(",")));
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 

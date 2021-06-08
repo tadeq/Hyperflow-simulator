@@ -4,6 +4,7 @@ import com.mmoskal.hyperflowsimulator.model.Environment;
 import com.mmoskal.hyperflowsimulator.model.Utilization;
 import com.mmoskal.hyperflowsimulator.model.envconfig.EnvironmentConfig;
 import com.mmoskal.hyperflowsimulator.model.envconfig.HostConfig;
+import com.mmoskal.hyperflowsimulator.model.envconfig.StorageConfig;
 import com.mmoskal.hyperflowsimulator.model.envconfig.VmConfig;
 import lombok.experimental.UtilityClass;
 import org.cloudbus.cloudsim.allocationpolicies.VmAllocationPolicyBestFit;
@@ -30,9 +31,10 @@ import java.util.stream.Collectors;
 public class EnvironmentConfigMapper {
 
     public Environment mapToEnvironment(EnvironmentConfig environmentConfig) {
-        CloudSim cloudsim = new CloudSim();
+        CloudSim cloudsim = new CloudSim(0.1);
         DatacenterBroker datacenterBroker = new DatacenterBrokerSimple(cloudsim);
-        FileStorage storage = new SanStorage(1000000, 5000, 0.01); //capacity in MBs, bandwidth in Mb/s
+        StorageConfig storageConfig = environmentConfig.getStorage();
+        FileStorage storage = new SanStorage(storageConfig.getCapacity(), storageConfig.getBandwidth(), storageConfig.getLatency()); //capacity in MBs, bandwidth in Mb/s
         DatacenterStorage datacenterStorage = new DatacenterStorage(List.of(storage));
         List<Host> hosts = environmentConfig.getHosts()
                 .stream()

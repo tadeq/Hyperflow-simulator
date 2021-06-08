@@ -54,6 +54,10 @@ public class LogGenerator {
         finishedCloudlets.forEach(cloudlet -> {
             Config config = jobsHistory.get(cloudlet.getId());
             ObjectNode mainNode = objectMapper.createObjectNode();
+            boolean isLastCloudletInGroup = jobGroups.stream()
+                    .filter(jobGroup -> !jobGroup.isEmpty())
+                    .map(jobGroup -> jobGroup.get(jobGroup.size() - 1))
+                    .anyMatch(lastCloudletInGroup -> lastCloudletInGroup.getContext().getProcId().equals(cloudlet.getId()));
             LocalDateTime cloudletStartTime = startTime
                     .plusNanos(((int) Math.round(cloudlet.getExecStartTime() * 1000)) % 1000 * 1000000)
                     .plusSeconds((int) cloudlet.getExecStartTime())
@@ -121,12 +125,6 @@ public class LogGenerator {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            boolean isLastCloudletInGroup = jobGroups.stream()
-                    .filter(jobGroup -> !jobGroup.isEmpty())
-                    .map(jobGroup -> jobGroup.get(jobGroup.size() - 1))
-                    .anyMatch(lastCloudletInGroup -> lastCloudletInGroup.getContext().getProcId().equals(cloudlet.getId()));
-            System.out.println("CLOUDLET " + cloudlet.getId() + " " + config.getContext().getName() + " IS LAST? " + isLastCloudletInGroup);
-            System.out.println("FINISHED BY VM  " + finishedCloudletsByVm.get(cloudlet.getVm().getId()));
             if (isLastCloudletInGroup) {
                 finishedCloudletsByVm.put(cloudlet.getVm().getId(), finishedCloudletsByVm.get(cloudlet.getVm().getId()) + 1);
             }

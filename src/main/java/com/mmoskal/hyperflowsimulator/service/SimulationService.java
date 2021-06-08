@@ -92,6 +92,7 @@ public class SimulationService {
         EnvironmentUtilizationService.showHostResourceUtilizationByVm(environment);
         EnvironmentUtilizationService.showCpuUtilizationForHosts(environment.getHosts());
         EnvironmentUtilizationService.showCpuUtilizationForVms(environment.getVms());
+        EnvironmentUtilizationService.saveHostResourceUtilization(environment);
         System.out.println("--------------------END OF SIMULATION--------------------");
         LogGenerator.generate(environment, jobsHistory, jobGroups);
         initEnvironment(environmentConfig);
@@ -104,7 +105,7 @@ public class SimulationService {
             Executor executor = config.getContext().getExecutor();
             cloudlet.setUtilizationModelCpu(new UtilizationModelDynamic(UtilizationModel.Unit.ABSOLUTE, executor.getCpuRequest()));
             cloudlet.setUtilizationModelRam(new UtilizationModelDynamic(UtilizationModel.Unit.ABSOLUTE, executor.getMemRequest()));
-            List<File> inFiles = mapToInputFiles(config.getIns());
+            List<File> inFiles = mapToInputFiles(config);
             inFiles.forEach(file -> {
                 environment.getDatacenter().getDatacenterStorage().addFile(file);
                 cloudlet.addRequiredFile(file.getName());
@@ -118,11 +119,14 @@ public class SimulationService {
         return (int) Math.round(config.getContext().getExecutor().getInstructions() / 1000000.0);
     }
 
-    private List<File> mapToInputFiles(List<Signal> inputs) {
+    private List<File> mapToInputFiles(Config config) {
+        List<Signal> inputs = config.getIns();
+        Optional<Double> filePart = Optional.ofNullable(config.getContext().getExecutor().getFilePart());
         return inputs.stream()
                 .map(in -> Optional.ofNullable(in.getSize())
                         .map(size -> (int) Math.round(size))
                         .filter(size -> size > 0)
+                        .map(size -> filePart.map(part -> (int) Math.round(size * part)).orElse(size))
                         .map(size -> new File(in.getName(), size)))
                 .filter(Optional::isPresent)
                 .map(Optional::get)

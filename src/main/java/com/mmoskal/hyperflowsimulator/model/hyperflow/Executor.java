@@ -24,4 +24,7 @@ public class Executor {
 
     @JsonProperty("cpuRequest")
     Long cpuRequest;
+
+    @JsonProperty("filePart")
+    Double filePart;
 }
