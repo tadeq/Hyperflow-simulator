@@ -107,12 +107,22 @@ public class SimulationService {
             cloudlet.setUtilizationModelRam(new UtilizationModelDynamic(UtilizationModel.Unit.ABSOLUTE, executor.getMemRequest()));
             List<File> inFiles = mapToInputFiles(config);
             inFiles.forEach(file -> {
-                environment.getDatacenter().getDatacenterStorage().addFile(file);
+                if (haveToAddFile(file.getName())) {
+                    environment.getDatacenter().getDatacenterStorage().addFile(file);
+                }
                 cloudlet.addRequiredFile(file.getName());
             });
             cloudlet.addOnFinishListener(eventInfo -> notifyCompletionAndWaitForCloudlets(config));
             return cloudlet;
         }).collect(Collectors.toList());
+    }
+
+    private boolean haveToAddFile(String filename) {
+        return environment.getDatacenter().getDatacenterStorage().getStorageList().stream()
+                .flatMap(storage -> storage.getFileNameList().stream())
+                .filter(filename::equals)
+                .findAny()
+                .isEmpty();
     }
 
     private int calculateCloudletInstructions(Config config) {
